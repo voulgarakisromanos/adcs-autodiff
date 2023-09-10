@@ -23,3 +23,14 @@ function rk4(I, w, torque, q, dt)
     
     return new_w, new_q
 end
+
+function rk4_filter(I, w, torque, q, dt)
+    _, k1_q = derivatives(I, w, torque, q)
+    _, k2_q = derivatives(I, w, torque, q .+ 0.5 .* dt .* k1_q)
+    _, k3_q = derivatives(I, w, torque, q .+ 0.5 .* dt .* k2_q)
+    _, k4_q = derivatives(I, w, torque, q .+ dt .* k3_q)
+    new_q = q .+ (dt / 6.0) .* (k1_q .+ 2 .* k2_q .+ 2 .* k3_q .+ k4_q)
+    # Normalize quaternion to ensure it stays a unit quaternion
+    new_q = normalize(new_q)
+    return new_q
+end

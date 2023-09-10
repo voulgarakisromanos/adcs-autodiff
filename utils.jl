@@ -26,11 +26,23 @@ function quaternion_exp(q::Vector{Float64})
     return [scalar_part; vector_part]
 end
 
-function rotate_vector_by_quaternion(v::AbstractArray, q::Vector{Float64})
-    # Extract the components of the quaternion
-    w, u = q[1], [q[2], q[3], q[4]]
-    # Rotate the vector
-    v_rotated = v + 2.0 * cross(u, cross(u, v) + w .* v)
+
+function quaternion_conjugate(q::Vector{Float64})
+    w, x, y, z = q
+    return [w, -x, -y, -z]
+end
+
+function rotate_vector_by_quaternion(v::AbstractVector, q::Vector{Float64})
+    # Represent the vector as a pure quaternion
+    v_quaternion = [0.0; v]
+    
+    # Compute the rotated vector
+    # v_rotated_quaternion = quat_mult(q, quat_mult(v_quaternion, quaternion_conjugate(q)))
+    v_rotated_quaternion = quat_mult( quaternion_conjugate(q), quat_mult(v_quaternion, q) );
+
+    # Extract the vector part
+    v_rotated = v_rotated_quaternion[2:4]
+
     return v_rotated
 end
 
@@ -66,4 +78,11 @@ function julian_to_gregorian(jd::Real)
     microsecond = (second - floor(second)) * 1e9  # Convert remaining fraction to nanoseconds
     
     return Int(year), Int(month), Int(floor(day)), Int(hour), Int(minute), Float64(floor(second)), Float64(floor(microsecond))
+end
+
+function package_weights(x)
+    Q = diagm(exp.([x[1],x[1],x[1],x[2],x[2],x[2]]))
+    R = diagm(exp.([x[3],x[3],x[3],x[4],x[4],x[4]]))
+    tunable_params = (Q,R)
+    return tunable_params
 end

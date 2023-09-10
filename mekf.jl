@@ -15,8 +15,13 @@ end
 
 function predict(state, P, kf::KalmanFilter, gyroscope_measurement)
     bias = state[5:7]
-    F_k = kf.transition_fun_jacobian(state, gyroscope_measurement, bias)
-    new_state = kf.transition_fun(state, gyroscope_measurement, bias, kf.dt)
+    q = state[1:4]
+    F_k = kf.transition_fun_jacobian(gyroscope_measurement, bias)
+    kf.transition_fun(q, gyroscope_measurement, bias, dt)
+    new_state = kf.transition_fun(q, gyroscope_measurement, bias, kf.dt)
+    # if new_state[1] < 0.0
+    #     new_state[1:4] = -new_state[1:4]
+    # end
     Phi = exp(F_k * kf.dt)
     new_P = Phi *  P * transpose(Phi) + kf.Q
     return (new_state, new_P)
@@ -30,7 +35,7 @@ function update(state, P, kf::KalmanFilter, groundtruth_measurements::Tuple, ref
     mag_body, sun_body = kf.measurement_fun(q, mag_eci, sun_eci)
     Kg = P * transpose(H_k) / (H_k * P * transpose(H_k) + kf.R)
         
-    local_error_state = Kg * ([groundtruth_measurements[1];groundtruth_measurements[2]] - [mag_eci;sun_eci])
+    local_error_state = Kg * ([groundtruth_measurements[1];groundtruth_measurements[2]] - [mag_body;sun_body])
     local_error_quaternion = [1;0.5 * local_error_state[1:3]]
     
     new_q = quat_mult(state[1:4],local_error_quaternion) 
@@ -42,16 +47,22 @@ function update(state, P, kf::KalmanFilter, groundtruth_measurements::Tuple, ref
     
     new_P = (identity_matrix .- Kg * H_k) * P
     new_state = [new_q;new_bias]
+    # if new_state[1] < 0.0
+    #     new_state[1:4] = -new_state[1:4]
+    # end
     return (new_state, new_P)
 end
 
 function transition_function(q, gyroscope_measurement, bias, dt)
-    w = gyroscope_measurement - bias                
-    q = quat_mult(q, quaternion_exp([0;w]*dt))
+    w = gyroscope_measurement - bias
+    q = quat_mult(q,quaternion_exp([0;w]*dt))
+    # torque = zeros(3)
+    # dummy_I = I(3)
+    # q = rk4_filter(I, w, torque, q, dt)
     next_state = vcat(q,bias)
 end
 
-function transition_function_jacobian(q, gyroscope_measurement, bias)
+function transition_function_jacobian(gyroscope_measurement, bias)
     w = gyroscope_measurement - bias
     F = vcat(hcat(-skew_symmetric(w),-1.0*I(3)), zeros(3,6))
 end
